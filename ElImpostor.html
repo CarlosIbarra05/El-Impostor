@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>El Impostor PRO</title>
+    <style>
+        /* Estilos Base - Tema Cyberpunk/Neón Oscuro */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0b0c10;
+            color: #c5c6c7;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background: #1f2833;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(102, 252, 241, 0.2);
+            box-sizing: border-box;
+        }
+
+        h1 {
+            color: #66fcf1;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 0;
+            text-shadow: 0 0 10px rgba(102, 252, 241, 0.5);
+        }
+
+        h2 { color: #45a29e; }
+
+        label {
+            display: block;
+            text-align: left;
+            margin-top: 20px;
+            color: #c5c6c7;
+            font-weight: bold;
+        }
+
+        select, input, button {
+            width: 100%;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 8px;
+            border: 1px solid #45a29e;
+            font-size: 16px;
+            box-sizing: border-box;
+            background-color: #0b0c10;
+            color: #66fcf1;
+            outline: none;
+        }
+
+        button {
+            background-color: #45a29e;
+            color: #0b0c10;
+            font-weight: bold;
+            font-size: 18px;
+            margin-top: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            border: none;
+        }
+
+        button:hover {
+            background-color: #66fcf1;
+            box-shadow: 0 0 15px rgba(102, 252, 241, 0.6);
+            transform: scale(1.02);
+        }
+
+        .btn-danger {
+            background-color: #ff3b3f;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #ff5e62;
+            box-shadow: 0 0 15px rgba(255, 59, 63, 0.6);
+        }
+
+        .hidden { display: none; }
+
+        .role-card {
+            font-size: 28px;
+            font-weight: bold;
+            margin: 30px 0;
+            padding: 50px 20px;
+            background: #0b0c10;
+            border-radius: 10px;
+            border: 2px solid #45a29e;
+            box-shadow: inset 0 0 20px rgba(69, 162, 158, 0.2);
+        }
+
+        .impostor-text {
+            color: #ff3b3f;
+            font-size: 36px;
+            text-shadow: 0 0 15px rgba(255, 59, 63, 0.8);
+            animation: glitch 1s infinite;
+        }
+
+        .word-text {
+            color: #66fcf1;
+            font-size: 34px;
+            text-shadow: 0 0 15px rgba(102, 252, 241, 0.5);
+        }
+
+        .timer-display {
+            font-size: 48px;
+            font-weight: bold;
+            color: #66fcf1;
+            margin: 20px 0;
+            font-family: monospace;
+        }
+
+        .timer-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        @keyframes glitch {
+            0% { transform: translate(0) }
+            20% { transform: translate(-2px, 2px) }
+            40% { transform: translate(-2px, -2px) }
+            60% { transform: translate(2px, 2px) }
+            80% { transform: translate(2px, -2px) }
+            100% { transform: translate(0) }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="setup-screen">
+        <h1>🕵️ El Impostor PRO</h1>
+        <p>Configuración Avanzada de Partida</p>
+
+        <label for="num-players">👥 Número de Jugadores (3-15):</label>
+        <input type="number" id="num-players" min="3" max="15" value="6">
+
+        <label for="num-impostors">🔪 Número de Impostores:</label>
+        <select id="num-impostors">
+            <option value="1">1 Impostor</option>
+            <option value="2">2 Impostores (Recomendado +6 jug.)</option>
+        </select>
+
+        <label for="category">📂 Categoría de Personajes:</label>
+        <select id="category">
+            <option value="anime_shonen">💥 Anime: Shonen (Goku, Naruto, Luffy...)</option>
+            <option value="anime_seinen">🩸 Anime: Seinen/Clásicos (Guts, Saitama...)</option>
+            <option value="anime_isekai">✨ Anime: Isekai/Magia (Kirito, Rimuru...)</option>
+            <option value="videojuegos">🎮 Videojuegos (Kratos, Master Chief...)</option>
+            <option value="peliculas">🍿 Películas (Darth Vader, Joker...)</option>
+        </select>
+
+        <button onclick="iniciarJuego()">Generar Partida</button>
+    </div>
+
+    <div class="container hidden" id="pass-screen">
+        <h1 id="player-turn-title">Turno del Jugador 1</h1>
+        <p>Asegúrate de estar solo antes de revelar tu identidad.</p>
+        <button onclick="mostrarRol()">Ver mi Rol en Secreto</button>
+    </div>
+
+    <div class="container hidden" id="reveal-screen">
+        <h2>Tu Identidad</h2>
+        <div class="role-card" id="role-display">
+            </div>
+        <button class="btn-danger" onclick="ocultarYPasar()">Ocultar y Pasar Dispositivo</button>
+    </div>
+
+    <div class="container hidden" id="game-active-screen">
+        <h1>🚨 Discusión Activa 🚨</h1>
+        <p id="game-info">Encuentren al Impostor. ¡Hagan sus preguntas!</p>
+        
+        <div class="timer-display" id="timer">05:00</div>
+        
+        <div class="timer-controls">
+            <button onclick="startTimer()">▶ Iniciar</button>
+            <button onclick="pauseTimer()" style="background-color: #c5c6c7; color: #0b0c10;">⏸ Pausa</button>
+            <button onclick="resetTimer()" style="background-color: #ff3b3f;">⏹ Reiniciar</button>
+        </div>
+
+        <button onclick="volverAlInicio()" style="margin-top: 50px;">Terminar y Nueva Partida</button>
+    </div>
+
+    <script>
+        // --- MEGA BASE DE DATOS ---
+        const categorias = {
+            anime_shonen: [
+                "Goku", "Vegeta", "Naruto Uzumaki", "Sasuke Uchiha", "Monkey D. Luffy", "Zoro Roronoa", 
+                "Ichigo Kurosaki", "Gon Freecss", "Killua Zoldyck", "Izuku Midoriya (Deku)", "Katsuki Bakugo", 
+                "Tanjiro Kamado", "Nezuko Kamado", "Yuji Itadori", "Satoru Gojo", "Denji (Chainsaw Man)", 
+                "Makima", "Eren Yeager", "Levi Ackerman", "Jotaro Kujo", "Dio Brando"
+            ],
+            anime_seinen: [
+                "Guts (Berserk)", "Griffith", "Spike Spiegel", "Motoko Kusanagi", "Saitama", 
+                "Mob (Shigeo Kageyama)", "Light Yagami", "L", "Edward Elric", "Roy Mustang", 
+                "Ken Kaneki", "Shinji Ikari", "Asuka Langley", "Thorfinn (Vinland Saga)"
+            ],
+            anime_isekai: [
+                "Kirito", "Asuna", "Rimuru Tempest", "Ainz Ooal Gown", "Subaru Natsuki", 
+                "Aqua", "Megumin", "Naofumi (Shield Hero)", "Rudeus Greyrat", "Shiroe (Log Horizon)"
+            ],
+            videojuegos: [
+                "Kratos", "Ellie (TLOU)", "Master Chief", "Samus Aran", "Mario", 
+                "Link", "Zelda", "Cloud Strife", "Solid Snake", "Lara Croft", 
+                "Geralt de Rivia", "Arthur Morgan", "Sonic", "Pikachu", "Steve (Minecraft)"
+            ],
+            peliculas: [
+                "Darth Vader", "Luke Skywalker", "El Guasón (Joker)", "Batman", "Thanos", 
+                "Iron Man", "Spider-Man", "Neo (Matrix)", "John Wick", "Jack Sparrow", 
+                "Harry Potter", "Voldemort", "Terminator", "Rocky Balboa"
+            ]
+        };
+
+        // --- ESTADO DEL JUEGO ---
+        let totalJugadores = 0;
+        let cantidadImpostores = 1;
+        let jugadorActual = 1;
+        let impostoresIDs = [];
+        let palabraSecreta = "";
+        
+        // Variables Timer
+        let timerInterval;
+        let timeLeft = 300; // 5 minutos por defecto
+        let isTimerRunning = false;
+
+        // --- FUNCIONES DEL JUEGO ---
+        function iniciarJuego() {
+            totalJugadores = parseInt(document.getElementById("num-players").value);
+            cantidadImpostores = parseInt(document.getElementById("num-impostors").value);
+            const categoriaElegida = document.getElementById("category").value;
+
+            // Validaciones
+            if (totalJugadores < 3) return alert("Se necesitan al menos 3 jugadores.");
+            if (cantidadImpostores >= totalJugadores) return alert("¡No puede haber más impostores que jugadores!");
+            if (cantidadImpostores === 2 && totalJugadores < 5) return alert("Para 2 impostores, se recomiendan al menos 5 jugadores.");
+
+            // Seleccionar palabra
+            const listaPalabras = categorias[categoriaElegida];
+            palabraSecreta = listaPalabras[Math.floor(Math.random() * listaPalabras.length)];
+
+            // Seleccionar Impostores sin repetir
+            impostoresIDs = [];
+            while (impostoresIDs.length < cantidadImpostores) {
+                let randomId = Math.floor(Math.random() * totalJugadores) + 1;
+                if (!impostoresIDs.includes(randomId)) {
+                    impostoresIDs.push(randomId);
+                }
+            }
+
+            jugadorActual = 1;
+            document.getElementById("game-info").innerText = `Hay ${cantidadImpostores} impostor(es) ocultos. ¡Buena suerte!`;
+            
+            cambiarPantalla("setup-screen", "pass-screen");
+            actualizarTituloTurno();
+        }
+
+        function mostrarRol() {
+            cambiarPantalla("pass-screen", "reveal-screen");
+            const roleDisplay = document.getElementById("role-display");
+
+            if (impostoresIDs.includes(jugadorActual)) {
+                roleDisplay.innerHTML = `
+                    <span class="impostor-text">¡ERES EL IMPOSTOR! 🔪</span>
+                    <br><br>
+                    <span style="font-size:16px; font-weight:normal; color:#c5c6c7;">
+                        Mimetízate. Escucha a los demás y adivina al personaje.
+                    </span>`;
+            } else {
+                roleDisplay.innerHTML = `
+                    <span style="font-size:18px; font-weight:normal; color:#c5c6c7;">El personaje secreto es:</span>
+                    <br><br>
+                    <span class="word-text">${palabraSecreta}</span>`;
+            }
+        }
+
+        function ocultarYPasar() {
+            if (jugadorActual < totalJugadores) {
+                jugadorActual++;
+                actualizarTituloTurno();
+                cambiarPantalla("reveal-screen", "pass-screen");
+            } else {
+                cambiarPantalla("reveal-screen", "game-active-screen");
+                resetTimer(); // Prepara el timer al llegar a la pantalla final
+            }
+        }
+
+        // --- FUNCIONES DEL CRONÓMETRO ---
+        function updateTimerDisplay() {
+            let minutes = Math.floor(timeLeft / 60);
+            let seconds = timeLeft % 60;
+            document.getElementById("timer").innerText = 
+                (minutes < 10 ? "0" : "") + minutes + ":" + 
+                (seconds < 10 ? "0" : "") + seconds;
+            
+            if (timeLeft <= 60) {
+                document.getElementById("timer").style.color = "#ff3b3f"; // Se pone rojo en el último minuto
+            } else {
+                document.getElementById("timer").style.color = "#66fcf1";
+            }
+        }
+
+        function startTimer() {
+            if (isTimerRunning) return;
+            isTimerRunning = true;
+            timerInterval = setInterval(() => {
+                if (timeLeft > 0) {
+                    timeLeft--;
+                    updateTimerDisplay();
+                } else {
+                    pauseTimer();
+                    alert("¡TIEMPO AGOTADO! Es hora de votar por el impostor.");
+                }
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            isTimerRunning = false;
+            clearInterval(timerInterval);
+        }
+
+        function resetTimer() {
+            pauseTimer();
+            timeLeft = 300; // 5 minutos
+            updateTimerDisplay();
+        }
+
+        // --- UTILIDADES ---
+        function cambiarPantalla(idOcultar, idMostrar) {
+            document.getElementById(idOcultar).classList.add("hidden");
+            document.getElementById(idMostrar).classList.remove("hidden");
+        }
+
+        function actualizarTituloTurno() {
+            document.getElementById("player-turn-title").innerText = `Turno del Jugador ${jugadorActual}`;
+        }
+
+        function volverAlInicio() {
+            pauseTimer();
+            cambiarPantalla("game-active-screen", "setup-screen");
+        }
+    </script>
+</body>
+</html>

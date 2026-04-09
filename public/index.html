@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Impostor PRO - Online</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #0b0c10; color: #c5c6c7; text-align: center; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .container { max-width: 500px; width: 100%; background: #1f2833; padding: 30px; border-radius: 12px; box-shadow: 0 0 20px rgba(102, 252, 241, 0.2); }
+        h1 { color: #66fcf1; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 10px rgba(102, 252, 241, 0.5); }
+        h2 { color: #45a29e; }
+        input, select, button { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #45a29e; box-sizing: border-box; font-size: 16px; background: #0b0c10; color: #66fcf1; outline: none; }
+        button { background: #45a29e; color: #0b0c10; font-weight: bold; cursor: pointer; transition: 0.3s; text-transform: uppercase; border: none; margin-top: 20px; }
+        button:hover { background: #66fcf1; box-shadow: 0 0 15px rgba(102, 252, 241, 0.6); transform: scale(1.02); }
+        .btn-danger { background: #ff3b3f; color: white; }
+        .btn-danger:hover { background: #ff5e62; box-shadow: 0 0 15px rgba(255, 59, 63, 0.6); }
+        .hidden { display: none; }
+        .role-card { font-size: 24px; font-weight: bold; margin: 20px 0; padding: 40px 20px; background: #0b0c10; border-radius: 10px; border: 2px solid #45a29e; box-shadow: inset 0 0 20px rgba(69, 162, 158, 0.2); }
+        .impostor { color: #ff3b3f; font-size: 30px; text-shadow: 0 0 15px rgba(255, 59, 63, 0.8); animation: glitch 1s infinite; }
+        .tripulante { color: #66fcf1; font-size: 32px; text-shadow: 0 0 15px rgba(102, 252, 241, 0.5); }
+        .jugador-lista { background: #0b0c10; padding: 10px; border-radius: 8px; text-align: left; border: 1px solid #45a29e; list-style: none; }
+        .jugador-lista li { padding: 5px 0; border-bottom: 1px dashed #45a29e; }
+        .timer-display { font-size: 40px; color: #66fcf1; font-family: monospace; margin: 20px 0; }
+        @keyframes glitch { 0% { transform: translate(0) } 20% { transform: translate(-2px, 2px) } 40% { transform: translate(-2px, -2px) } 60% { transform: translate(2px, 2px) } 80% { transform: translate(2px, -2px) } 100% { transform: translate(0) } }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="login-screen">
+        <h1>🕵️ Impostor PRO</h1>
+        <input type="text" id="nombre" placeholder="Tu Nombre">
+        <input type="text" id="sala" placeholder="Código de Sala (ej. BETA)">
+        <button onclick="unirse()">Entrar a la Sala</button>
+    </div>
+
+    <div class="container hidden" id="lobby-screen">
+        <h2>SALA: <span id="nombre-sala" style="color: #66fcf1;"></span></h2>
+        <ul id="lista-jugadores" class="jugador-lista"></ul>
+        
+        <label style="color: #45a29e; text-align: left; display: block; margin-top: 15px;">Configuración (Solo el Host):</label>
+        <select id="categoria">
+            <option value="anime_shonen">💥 Anime: Shonen</option>
+            <option value="anime_seinen">🩸 Anime: Seinen/Clásicos</option>
+            <option value="anime_isekai">✨ Anime: Isekai</option>
+            <option value="videojuegos">🎮 Videojuegos</option>
+            <option value="peliculas">🍿 Películas</option>
+        </select>
+        <select id="num-impostores">
+            <option value="1">1 Impostor</option>
+            <option value="2">2 Impostores (Recomendado +6 jug.)</option>
+        </select>
+
+        <button onclick="iniciar()">Iniciar Partida</button>
+    </div>
+
+    <div class="container hidden" id="game-screen">
+        <h1>Identidad Revelada</h1>
+        <div id="rol-display" class="role-card"></div>
+        
+        <div class="timer-display" id="timer">05:00</div>
+        <button onclick="startTimer()" style="margin-top: 0;">Iniciar Cronómetro Local</button>
+
+        <button class="btn-danger" onclick="volverLobby()" style="margin-top: 40px;">Volver a la Sala</button>
+    </div>
+
+    <script>
+        const socket = io();
+        let miSala = '';
+        let timerInterval;
+        let timeLeft = 300;
+
+        function unirse() {
+            const nombre = document.getElementById('nombre').value;
+            miSala = document.getElementById('sala').value.toUpperCase();
+            if(!nombre || !miSala) return alert("Llena ambos campos");
+
+            socket.emit('unirseSala', { nombre, sala: miSala });
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('lobby-screen').classList.remove('hidden');
+            document.getElementById('nombre-sala').innerText = miSala;
+        }
+
+        socket.on('actualizarJugadores', (jugadores) => {
+            const lista = document.getElementById('lista-jugadores');
+            lista.innerHTML = '';
+            jugadores.forEach(j => {
+                lista.innerHTML += `<li>👤 ${j.nombre}</li>`;
+            });
+        });
+
+        function iniciar() {
+            const categoria = document.getElementById('categoria').value;
+            const numImpostores = parseInt(document.getElementById('num-impostores').value);
+            socket.emit('iniciarJuego', { sala: miSala, categoria, numImpostores });
+        }
+
+        socket.on('recibirRol', (data) => {
+            document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            
+            const display = document.getElementById('rol-display');
+            if(data.esImpostor) {
+                display.innerHTML = `
+                    <span class="impostor">¡ERES EL IMPOSTOR! 🔪</span><br><br>
+                    <span style="font-size: 16px; font-weight: normal; color: #c5c6c7;">
+                        (Hay ${data.numImpostores} impostor/es en total).<br>Finge y sobrevive.
+                    </span>`;
+            } else {
+                display.innerHTML = `
+                    <span style="font-size: 16px; font-weight: normal; color: #c5c6c7;">El personaje secreto es:</span><br><br>
+                    <span class="tripulante">${data.palabra}</span>`;
+            }
+            
+            // Reiniciar timer visualmente
+            timeLeft = 300;
+            document.getElementById("timer").innerText = "05:00";
+            clearInterval(timerInterval);
+        });
+
+        // Cronómetro Local para la fase de discusión
+        function startTimer() {
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (timeLeft > 0) {
+                    timeLeft--;
+                    let minutes = Math.floor(timeLeft / 60);
+                    let seconds = timeLeft % 60;
+                    document.getElementById("timer").innerText = 
+                        (minutes < 10 ? "0" : "") + minutes + ":" + 
+                        (seconds < 10 ? "0" : "") + seconds;
+                }
+            }, 1000);
+        }
+
+        function volverLobby() {
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('lobby-screen').classList.remove('hidden');
+            clearInterval(timerInterval);
+        }
+    </script>
+</body>
+</html>
