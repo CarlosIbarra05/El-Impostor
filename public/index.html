@@ -235,10 +235,15 @@
             background: #45a29e;
             border-radius: 10px;
         }
+        
+        .palabras-grid {
+            display: grid;
+            gap: 12px;
+            margin: 20px 0;
+        }
     </style>
 </head>
 <body>
-    <!-- Pantalla de Login -->
     <div class="container" id="login-screen">
         <h1>🕵️ IMPOSTOR PRO</h1>
         <p style="margin-bottom: 30px; color: #45a29e;">Juego de Deducción y Engaño</p>
@@ -247,7 +252,6 @@
         <button onclick="unirse()">🎮 Unirse a la Sala</button>
     </div>
     
-    <!-- Pantalla de Lobby -->
     <div class="container hidden" id="lobby-screen">
         <h1>🏆 SALA: <span id="nombre-sala" style="color: #66fcf1;"></span></h1>
         
@@ -271,7 +275,6 @@
         <button onclick="volverLogin()" class="btn-danger" style="margin-top: 10px;">⬅️ Salir de la Sala</button>
     </div>
     
-    <!-- Pantalla de Rol -->
     <div class="container hidden" id="rol-screen">
         <h1>🎭 TU IDENTIDAD</h1>
         <div id="rol-display" class="role-card"></div>
@@ -279,7 +282,6 @@
         <button onclick="continuarAJuego()" id="btn-continuar">▶ Continuar</button>
     </div>
     
-    <!-- Pantalla de Escritura -->
     <div class="container hidden" id="escritura-screen">
         <h1>✍️ ESCRIBE TU PALABRA</h1>
         <div class="info-box" id="escritura-info"></div>
@@ -288,15 +290,13 @@
         <p style="margin-top: 20px; font-size: 14px; color: #45a29e;">💡 Tip: Los tripulantes conocen el personaje, ¡el impostor debe usar la categoría como pista!</p>
     </div>
     
-    <!-- Pantalla de Votación -->
     <div class="container hidden" id="votacion-screen">
         <h1>🗳️ VOTA AL IMPOSTOR</h1>
         <div class="info-box" id="votacion-info"></div>
-        <div id="palabras-lista"></div>
+        <div id="palabras-lista" class="palabras-grid"></div>
         <button onclick="enviarVoto()" id="btn-votar" disabled>✅ Confirmar Voto</button>
     </div>
     
-    <!-- Pantalla de Resultados -->
     <div class="container hidden" id="resultados-screen">
         <h1 id="resultado-titulo">🎉 JUEGO TERMINADO</h1>
         <div id="resultado-info" class="role-card"></div>
@@ -304,7 +304,6 @@
         <button onclick="volverLogin()" class="btn-danger" style="margin-top: 10px;">🏠 Menú Principal</button>
     </div>
     
-    <!-- Pantalla de Espera entre Rondas -->
     <div class="container hidden" id="espera-screen">
         <h1>⏳ SIGUIENTE RONDA</h1>
         <div id="espera-info" class="info-box"></div>
@@ -322,7 +321,6 @@
         let votoSeleccionado = null;
         let rondaActual = 1;
         
-        // Funciones de UI
         function cambiarPantalla(ocultar, mostrar) {
             document.getElementById(ocultar).classList.add('hidden');
             document.getElementById(mostrar).classList.remove('hidden');
@@ -392,29 +390,36 @@
             document.getElementById('escritura-info').innerHTML = '<strong>✅ Palabra enviada!</strong><br>Esperando a los demás jugadores...';
         }
         
+        // Esta función muestra TODAS las palabras de TODOS los jugadores
         function mostrarVotacion(palabras) {
             palabrasVotacion = palabras;
             votoSeleccionado = null;
             
             const container = document.getElementById('palabras-lista');
-            container.innerHTML = '<h3>📝 Palabras de los jugadores:</h3>';
+            container.innerHTML = '<h3>📝 Palabras de todos los jugadores:</h3>';
             
+            // Mostrar cada palabra con el nombre del jugador que la escribió
             palabras.forEach(p => {
                 const div = document.createElement('div');
                 div.className = 'palabra-item';
                 div.innerHTML = `
-                    <strong>👤 ${p.nombre}</strong><br>
-                    <span style="color: #66fcf1;">"${p.palabra}"</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 1.1em;">👤 <strong>${p.nombre}</strong></span>
+                        <span style="color: #66fcf1; font-size: 1.2em;">"${p.palabra}"</span>
+                    </div>
                 `;
                 div.onclick = () => seleccionarVoto(p.id, div);
                 container.appendChild(div);
             });
             
             document.getElementById('btn-votar').disabled = true;
+            document.getElementById('votacion-info').innerHTML = `
+                <strong>🗳️ RONDA ${rondaActual}/3</strong><br>
+                Haz clic en la palabra que crees que escribió el impostor
+            `;
         }
         
         function seleccionarVoto(jugadorId, elemento) {
-            // Remover selección anterior
             document.querySelectorAll('.palabra-item').forEach(item => {
                 item.classList.remove('selected');
             });
@@ -435,7 +440,6 @@
             document.getElementById('votacion-info').innerHTML = '<strong>✅ Voto registrado!</strong><br>Esperando resultados...';
         }
         
-        // Eventos de Socket
         socket.on('actualizarJugadores', (jugadores) => {
             const lista = document.getElementById('lista-jugadores');
             lista.innerHTML = '';
@@ -502,9 +506,9 @@
             cambiarPantalla('espera-screen', 'escritura-screen');
         });
         
+        // Aquí recibe TODAS las palabras de TODOS los jugadores
         socket.on('faseVotacion', (data) => {
             rondaActual = data.ronda;
-            document.getElementById('votacion-info').innerHTML = `<strong>🗳️ RONDA ${data.ronda}/3</strong><br>Vota por el jugador que crees que es el impostor`;
             mostrarVotacion(data.palabras);
             cambiarPantalla('escritura-screen', 'votacion-screen');
         });
