@@ -22,7 +22,6 @@ const salas = {};
 io.on('connection', (socket) => {
     console.log('Usuario conectado:', socket.id);
 
-    // Unirse a una sala
     socket.on('unirseSala', ({ nombre, sala }) => {
         socket.join(sala);
         
@@ -44,7 +43,6 @@ io.on('connection', (socket) => {
         io.to(sala).emit('actualizarJugadores', salas[sala].jugadores);
     });
 
-    // Iniciar partida
     socket.on('iniciarJuego', ({ sala, categoria }) => {
         const salaData = salas[sala];
         
@@ -55,7 +53,6 @@ io.on('connection', (socket) => {
         
         if (salaData.partidaActiva) return;
         
-        // Reiniciar estado del juego
         salaData.partidaActiva = true;
         salaData.rondaActual = 1;
         salaData.palabrasEnviadas = {};
@@ -63,16 +60,13 @@ io.on('connection', (socket) => {
         salaData.eliminados = [];
         salaData.categoriaActual = categoria;
         
-        // Elegir palabra secreta
         const palabras = categorias[categoria];
         salaData.palabraSecreta = palabras[Math.floor(Math.random() * palabras.length)];
         
-        // Elegir impostor (jugador activo no eliminado)
         const jugadoresActivos = salaData.jugadores.filter(j => !salaData.eliminados.includes(j.id));
         const impostorIndex = Math.floor(Math.random() * jugadoresActivos.length);
         salaData.impostorId = jugadoresActivos[impostorIndex].id;
         
-        // Asignar roles
         salaData.jugadores.forEach(jugador => {
             if (jugador.id === salaData.impostorId) {
                 io.to(jugador.id).emit('recibirRol', {
@@ -90,13 +84,11 @@ io.on('connection', (socket) => {
             }
         });
         
-        // Iniciar fase de escritura
         setTimeout(() => {
             iniciarFaseEscritura(sala);
         }, 3000);
     });
     
-    // Recibir palabra del jugador
     socket.on('enviarPalabra', ({ sala, palabra }) => {
         const salaData = salas[sala];
         
@@ -104,7 +96,6 @@ io.on('connection', (socket) => {
         
         salaData.palabrasEnviadas[socket.id] = palabra;
         
-        // Verificar si todos los jugadores activos han enviado su palabra
         const jugadoresActivos = salaData.jugadores.filter(j => !salaData.eliminados.includes(j.id));
         
         if (Object.keys(salaData.palabrasEnviadas).length === jugadoresActivos.length) {
@@ -112,7 +103,6 @@ io.on('connection', (socket) => {
         }
     });
     
-    // Recibir voto
     socket.on('enviarVoto', ({ sala, votoParaId }) => {
         const salaData = salas[sala];
         
@@ -120,7 +110,6 @@ io.on('connection', (socket) => {
         
         salaData.votos[socket.id] = votoParaId;
         
-        // Verificar si todos los jugadores activos han votado
         const jugadoresActivos = salaData.jugadores.filter(j => !salaData.eliminados.includes(j.id));
         
         if (Object.keys(salaData.votos).length === jugadoresActivos.length) {
@@ -137,7 +126,6 @@ io.on('connection', (socket) => {
                 salaData.jugadores.splice(jugadorIndex, 1);
                 io.to(sala).emit('actualizarJugadores', salaData.jugadores);
                 
-                // Si se desconecta el impostor, terminar partida
                 if (salaData.impostorId === socket.id && salaData.partidaActiva) {
                     salaData.partidaActiva = false;
                     io.to(sala).emit('juegoTerminado', { ganador: 'tripulantes', motivo: 'El impostor abandonó la partida' });
@@ -175,13 +163,14 @@ function iniciarFaseVotacion(sala) {
     
     const jugadoresActivos = salaData.jugadores.filter(j => !salaData.eliminados.includes(j.id));
     
-    // Preparar lista de palabras para mostrar
+    // IMPORTANTE: Aquí se envía a TODOS los jugadores la lista COMPLETA de palabras
     const palabrasLista = jugadoresActivos.map(jugador => ({
         id: jugador.id,
         nombre: jugador.nombre,
         palabra: salaData.palabrasEnviadas[jugador.id]
     }));
     
+    // Enviar a TODOS los jugadores la misma lista
     jugadoresActivos.forEach(jugador => {
         io.to(jugador.id).emit('faseVotacion', {
             palabras: palabrasLista,
@@ -195,13 +184,11 @@ function procesarEliminacion(sala) {
     
     if (!salaData || !salaData.partidaActiva) return;
     
-    // Contar votos
     const votosContados = {};
     for (const voto of Object.values(salaData.votos)) {
         votosContados[voto] = (votosContados[voto] || 0) + 1;
     }
     
-    // Encontrar al más votado
     let maxVotos = 0;
     let eliminadoId = null;
     
@@ -212,11 +199,9 @@ function procesarEliminacion(sala) {
         }
     }
     
-    // Verificar si el eliminado es el impostor
     const esImpostor = (eliminadoId === salaData.impostorId);
     
     if (esImpostor) {
-        // Los tripulantes ganan
         salaData.partidaActiva = false;
         io.to(sala).emit('juegoTerminado', { 
             ganador: 'tripulantes', 
@@ -226,28 +211,23 @@ function procesarEliminacion(sala) {
         return;
     }
     
-    // Eliminar al jugador
     salaData.eliminados.push(eliminadoId);
     
-    // Verificar si quedan suficientes jugadores
     const jugadoresActivos = salaData.jugadores.filter(j => !salaData.eliminados.includes(j.id));
     
     if (jugadoresActivos.length <= 2) {
-        // Impostor gana por falta de jugadores
         salaData.partidaActiva = false;
         io.to(sala).emit('juegoTerminado', { 
             ganador: 'impostor', 
-            motivo: '¡El impostor ha eliminado a suficientes tripulantes y ahora domina la nave!',
+            motivo: '¡El impostor ha eliminado a suficientes tripulantes!',
             impostorNombre: salaData.jugadores.find(j => j.id === salaData.impostorId)?.nombre
         });
         return;
     }
     
-    // Avanzar a siguiente ronda
     salaData.rondaActual++;
     
     if (salaData.rondaActual > 3) {
-        // El impostor sobrevivió 3 rondas
         salaData.partidaActiva = false;
         io.to(sala).emit('juegoTerminado', { 
             ganador: 'impostor', 
@@ -257,7 +237,6 @@ function procesarEliminacion(sala) {
         return;
     }
     
-    // Notificar eliminación y pasar a siguiente ronda
     const eliminadoNombre = salaData.jugadores.find(j => j.id === eliminadoId)?.nombre;
     
     io.to(sala).emit('rondaSiguiente', {
@@ -266,7 +245,6 @@ function procesarEliminacion(sala) {
         maxRondas: 3
     });
     
-    // Iniciar nueva ronda de escritura
     setTimeout(() => {
         iniciarFaseEscritura(sala);
     }, 4000);
