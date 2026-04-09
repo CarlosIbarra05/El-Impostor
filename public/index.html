@@ -13,15 +13,19 @@
         input, select, button { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #45a29e; box-sizing: border-box; font-size: 16px; background: #0b0c10; color: #66fcf1; outline: none; }
         button { background: #45a29e; color: #0b0c10; font-weight: bold; cursor: pointer; transition: 0.3s; text-transform: uppercase; border: none; margin-top: 20px; }
         button:hover { background: #66fcf1; box-shadow: 0 0 15px rgba(102, 252, 241, 0.6); transform: scale(1.02); }
+        button:disabled { background: #555; color: #222; cursor: not-allowed; box-shadow: none; border: none; }
         .btn-danger { background: #ff3b3f; color: white; }
         .btn-danger:hover { background: #ff5e62; box-shadow: 0 0 15px rgba(255, 59, 63, 0.6); }
         .hidden { display: none; }
-        .role-card { font-size: 24px; font-weight: bold; margin: 20px 0; padding: 40px 20px; background: #0b0c10; border-radius: 10px; border: 2px solid #45a29e; box-shadow: inset 0 0 20px rgba(69, 162, 158, 0.2); }
+        .role-card { font-size: 24px; font-weight: bold; margin: 20px 0; padding: 30px 20px; background: #0b0c10; border-radius: 10px; border: 2px solid #45a29e; box-shadow: inset 0 0 20px rgba(69, 162, 158, 0.2); }
         .impostor { color: #ff3b3f; font-size: 30px; text-shadow: 0 0 15px rgba(255, 59, 63, 0.8); animation: glitch 1s infinite; }
         .tripulante { color: #66fcf1; font-size: 32px; text-shadow: 0 0 15px rgba(102, 252, 241, 0.5); }
+        .pista { color: #f2a900; font-size: 18px; margin-top: 10px; display: block; }
         .jugador-lista { background: #0b0c10; padding: 10px; border-radius: 8px; text-align: left; border: 1px solid #45a29e; list-style: none; }
         .jugador-lista li { padding: 5px 0; border-bottom: 1px dashed #45a29e; }
-        .timer-display { font-size: 40px; color: #66fcf1; font-family: monospace; margin: 20px 0; }
+        .voto-btn { background: #0b0c10; color: #66fcf1; border: 1px solid #66fcf1; margin: 5px 0; display: block; text-align: left; padding: 15px; }
+        .voto-btn:hover { background: #1f2833; color: #fff; }
+        .voto-btn strong { color: #ff3b3f; }
         @keyframes glitch { 0% { transform: translate(0) } 20% { transform: translate(-2px, 2px) } 40% { transform: translate(-2px, -2px) } 60% { transform: translate(2px, 2px) } 80% { transform: translate(2px, -2px) } 100% { transform: translate(0) } }
     </style>
 </head>
@@ -55,20 +59,41 @@
     </div>
 
     <div class="container hidden" id="game-screen">
-        <h1>Identidad Revelada</h1>
+        <h1 id="ronda-titulo">Ronda 1</h1>
         <div id="rol-display" class="role-card"></div>
         
-        <div class="timer-display" id="timer">05:00</div>
-        <button onclick="startTimer()" style="margin-top: 0;">Iniciar Cronómetro Local</button>
+        <p style="color: #c5c6c7; margin-top: 20px;">Escribe una palabra relacionada para probar que no eres el impostor (o para fingir que sabes):</p>
+        <input type="text" id="palabra-enviada" placeholder="Tu palabra clave...">
+        <button id="btn-enviar-palabra" onclick="enviarPalabra()">Enviar Palabra</button>
+        <p id="esperando-palabras" class="hidden" style="color: #f2a900; margin-top: 15px;">Esperando a los demás jugadores...</p>
+    </div>
 
-        <button class="btn-danger" onclick="volverLobby()" style="margin-top: 40px;">Volver a la Sala</button>
+    <div class="container hidden" id="vote-screen">
+        <h1>Votación</h1>
+        <p style="color: #c5c6c7;">Analiza las palabras. Vota por el jugador que creas que es el Impostor.</p>
+        <div id="lista-votos"></div>
+        <p id="esperando-votos" class="hidden" style="color: #f2a900; margin-top: 15px;">Esperando que todos voten...</p>
+    </div>
+
+    <div class="container hidden" id="result-screen">
+        <h1 id="titulo-resultado">Resultado</h1>
+        <div class="role-card" id="mensaje-resultado" style="font-size: 20px; color: #fff;"></div>
+        <button id="btn-siguiente-ronda" class="hidden" onclick="prepararSiguienteRonda()">Ir a Siguiente Ronda</button>
+        <button id="btn-volver-lobby" class="hidden btn-danger" onclick="volverLobby()">Volver a la Sala</button>
     </div>
 
     <script>
         const socket = io();
         let miSala = '';
-        let timerInterval;
-        let timeLeft = 300;
+        let miId = '';
+        let rolGuardado = '';
+
+        function cambiarPantalla(pantallaMostrar) {
+            ['login-screen', 'lobby-screen', 'game-screen', 'vote-screen', 'result-screen'].forEach(p => {
+                document.getElementById(p).classList.add('hidden');
+            });
+            document.getElementById(pantallaMostrar).classList.remove('hidden');
+        }
 
         function unirse() {
             const nombre = document.getElementById('nombre').value;
@@ -76,17 +101,14 @@
             if(!nombre || !miSala) return alert("Llena ambos campos");
 
             socket.emit('unirseSala', { nombre, sala: miSala });
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('lobby-screen').classList.remove('hidden');
+            cambiarPantalla('lobby-screen');
             document.getElementById('nombre-sala').innerText = miSala;
         }
 
         socket.on('actualizarJugadores', (jugadores) => {
             const lista = document.getElementById('lista-jugadores');
             lista.innerHTML = '';
-            jugadores.forEach(j => {
-                lista.innerHTML += `<li>👤 ${j.nombre}</li>`;
-            });
+            jugadores.forEach(j => { lista.innerHTML += `<li>👤 ${j.nombre}</li>`; });
         });
 
         function iniciar() {
@@ -95,48 +117,109 @@
             socket.emit('iniciarJuego', { sala: miSala, categoria, numImpostores });
         }
 
+        // Al iniciar el juego, recibimos nuestro rol
         socket.on('recibirRol', (data) => {
-            document.getElementById('lobby-screen').classList.add('hidden');
-            document.getElementById('game-screen').classList.remove('hidden');
+            cambiarPantalla('game-screen');
+            document.getElementById('ronda-titulo').innerText = "Ronda 1 de 3";
+            
+            // Habilitar campos de escritura
+            document.getElementById('palabra-enviada').value = '';
+            document.getElementById('palabra-enviada').disabled = false;
+            document.getElementById('btn-enviar-palabra').classList.remove('hidden');
+            document.getElementById('esperando-palabras').classList.add('hidden');
             
             const display = document.getElementById('rol-display');
             if(data.esImpostor) {
-                display.innerHTML = `
-                    <span class="impostor">¡ERES EL IMPOSTOR! 🔪</span><br><br>
-                    <span style="font-size: 16px; font-weight: normal; color: #c5c6c7;">
-                        (Hay ${data.numImpostores} impostor/es en total).<br>Finge y sobrevive.
-                    </span>`;
+                rolGuardado = `
+                    <span class="impostor">¡ERES EL IMPOSTOR! 🔪</span><br>
+                    <span class="pista">Categoría: ${data.categoria}</span><br>
+                    <span style="font-size: 14px; font-weight: normal; color: #c5c6c7;">Finge y escribe una palabra que encaje.</span>`;
             } else {
-                display.innerHTML = `
-                    <span style="font-size: 16px; font-weight: normal; color: #c5c6c7;">El personaje secreto es:</span><br><br>
-                    <span class="tripulante">${data.palabra}</span>`;
+                rolGuardado = `
+                    <span style="font-size: 16px; font-weight: normal; color: #c5c6c7;">El personaje secreto es:</span><br>
+                    <span class="tripulante">${data.palabra}</span><br>
+                    <span class="pista">Categoría: ${data.categoria}</span>`;
             }
-            
-            // Reiniciar timer visualmente
-            timeLeft = 300;
-            document.getElementById("timer").innerText = "05:00";
-            clearInterval(timerInterval);
+            display.innerHTML = rolGuardado;
         });
 
-        // Cronómetro Local para la fase de discusión
-        function startTimer() {
-            clearInterval(timerInterval);
-            timerInterval = setInterval(() => {
-                if (timeLeft > 0) {
-                    timeLeft--;
-                    let minutes = Math.floor(timeLeft / 60);
-                    let seconds = timeLeft % 60;
-                    document.getElementById("timer").innerText = 
-                        (minutes < 10 ? "0" : "") + minutes + ":" + 
-                        (seconds < 10 ? "0" : "") + seconds;
-                }
-            }, 1000);
+        function enviarPalabra() {
+            const palabra = document.getElementById('palabra-enviada').value;
+            if(!palabra) return alert("Escribe una palabra primero");
+
+            socket.emit('enviarPalabra', { sala: miSala, palabra });
+            
+            document.getElementById('palabra-enviada').disabled = true;
+            document.getElementById('btn-enviar-palabra').classList.add('hidden');
+            document.getElementById('esperando-palabras').classList.remove('hidden');
         }
 
+        // Recibimos todas las palabras y pasamos a votar
+        socket.on('faseVotacion', (listaPalabras) => {
+            cambiarPantalla('vote-screen');
+            document.getElementById('esperando-votos').classList.add('hidden');
+            
+            const contenedorVotos = document.getElementById('lista-votos');
+            contenedorVotos.innerHTML = '';
+
+            listaPalabras.forEach(item => {
+                contenedorVotos.innerHTML += `
+                    <button class="voto-btn" onclick="votarJugador('${item.id}', this)">
+                        👤 ${item.nombre}: <strong>"${item.palabra}"</strong>
+                    </button>`;
+            });
+        });
+
+        function votarJugador(idVotado, btnContexto) {
+            socket.emit('enviarVoto', { sala: miSala, idVotado });
+            
+            // Deshabilitar todos los botones tras votar
+            const botones = document.querySelectorAll('.voto-btn');
+            botones.forEach(b => b.disabled = true);
+            btnContexto.style.background = "#45a29e"; // Marcar el elegido
+            btnContexto.style.color = "#0b0c10";
+            
+            document.getElementById('esperando-votos').classList.remove('hidden');
+        }
+
+        // Al terminar una ronda que NO es el final del juego
+        socket.on('siguienteRonda', (data) => {
+            cambiarPantalla('result-screen');
+            document.getElementById('titulo-resultado').innerText = `Fin de la Ronda ${data.ronda - 1}`;
+            document.getElementById('mensaje-resultado').innerHTML = `
+                ${data.mensaje}<br><br>
+                <span style="color: #f2a900;">El juego continúa...</span>`;
+            
+            document.getElementById('btn-siguiente-ronda').classList.remove('hidden');
+            document.getElementById('btn-volver-lobby').classList.add('hidden');
+            
+            // Preparar UI para la siguiente ronda
+            document.getElementById('ronda-titulo').innerText = `Ronda ${data.ronda} de 3`;
+        });
+
+        function prepararSiguienteRonda() {
+            cambiarPantalla('game-screen');
+            document.getElementById('rol-display').innerHTML = rolGuardado; // Volver a mostrar el rol
+            document.getElementById('palabra-enviada').value = '';
+            document.getElementById('palabra-enviada').disabled = false;
+            document.getElementById('btn-enviar-palabra').classList.remove('hidden');
+            document.getElementById('esperando-palabras').classList.add('hidden');
+        }
+
+        // Al terminar el juego (Impostores o Tripulantes ganan)
+        socket.on('finJuego', (data) => {
+            cambiarPantalla('result-screen');
+            document.getElementById('titulo-resultado').innerText = "¡PARTIDA TERMINADA!";
+            document.getElementById('mensaje-resultado').innerHTML = `
+                <strong style="font-size:24px;">${data.mensaje}</strong><br><br>
+                <span style="color: #66fcf1;">El personaje era: ${data.palabra}</span>`;
+            
+            document.getElementById('btn-siguiente-ronda').classList.add('hidden');
+            document.getElementById('btn-volver-lobby').classList.remove('hidden');
+        });
+
         function volverLobby() {
-            document.getElementById('game-screen').classList.add('hidden');
-            document.getElementById('lobby-screen').classList.remove('hidden');
-            clearInterval(timerInterval);
+            cambiarPantalla('lobby-screen');
         }
     </script>
 </body>
